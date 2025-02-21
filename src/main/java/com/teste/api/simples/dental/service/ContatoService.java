@@ -1,0 +1,97 @@
+package com.teste.api.simples.dental.service;
+
+import com.teste.api.simples.dental.dtos.ContatoDTO;
+import com.teste.api.simples.dental.entities.Contato;
+import com.teste.api.simples.dental.entities.Profissional;
+import com.teste.api.simples.dental.repositories.ContatoRepository;
+import com.teste.api.simples.dental.repositories.ProfissionalRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class ContatoService {
+
+    @Autowired
+    private ContatoRepository contatoRepository;
+
+    @Autowired
+    private ProfissionalRepository profissionalRepository;
+
+    public List<ContatoDTO> buscarContatos(String q, List<String> fields) {
+        List<Contato> contatos;
+
+        if (q != null && !q.isEmpty()) {
+            contatos = contatoRepository.findByNomeContainingOrContatoContaining(q, q);
+        } else {
+            contatos = contatoRepository.findAll();
+        }
+
+        if (fields != null && !fields.isEmpty()) {
+            return contatos.stream()
+                    .map(contato -> filterFields(contato, fields))
+                    .collect(Collectors.toList());
+        }
+
+        return contatos.stream()
+                .map(contato -> new ContatoDTO(contato.getNome(), contato.getContato()))
+                .collect(Collectors.toList());
+    }
+
+    private ContatoDTO filterFields(Contato contato, List<String> fields) {
+        ContatoDTO contatoDTO = new ContatoDTO();
+
+        if (fields.contains("nome")) {
+            contatoDTO.setNome(contato.getNome());
+        }
+
+        if (fields.contains("contato")) {
+            contatoDTO.setContato(contato.getContato());
+        }
+        return contatoDTO;
+    }
+
+
+    public ContatoDTO obterContato(Long id) {
+        Optional<Contato> contato = contatoRepository.findById(id);
+        return contato.map(c -> convertToDTO(c)).orElse(null);
+    }
+
+    private ContatoDTO convertToDTO(Contato contato) {
+        return ContatoDTO.builder()
+                .nome(contato.getNome())
+                .contato(contato.getContato())
+                .build();
+    }
+
+
+    public Long criarContato(Contato contato, Long profissionalId) {
+        Optional<Profissional> profissional = profissionalRepository.findById(profissionalId);
+        if (profissional.isPresent()) {
+            contato.setProfissional(profissional.get());
+            Contato contatoSalvo = contatoRepository.save(contato);
+            return contatoSalvo.getId();
+        }
+        throw new IllegalArgumentException("Profissional não encontrado");
+    }
+
+    public void atualizarContato(Long id, Contato contato) {
+        Optional<Contato> contatoExistente = contatoRepository.findById(id);
+        if (contatoExistente.isPresent()) {
+            Contato c = contatoExistente.get();
+            c.setNome(contato.getNome());
+            c.setContato(contato.getContato());
+            contatoRepository.save(c);
+        }
+    }
+
+    public void excluirContato(Long id) {
+        Optional<Contato> contato = contatoRepository.findById(id);
+        if (contato.isPresent()) {
+            contatoRepository.delete(contato.get());
+        }
+    }
+}
